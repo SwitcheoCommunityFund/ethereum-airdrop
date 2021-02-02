@@ -11,4 +11,4 @@ This system is monitoring all transactions on TradeHub smart-contract, decode da
 
 All the necessary data from transactions, statuses, current pagination statuses are stored in PostgreSQL db. If there is an error the system is sending out an email to the added email addresses with error info.
 
-## Airdrop log here https://swth.info/airdrop-log/
+## Airdrop log: https://swth.info/airdrop-log/

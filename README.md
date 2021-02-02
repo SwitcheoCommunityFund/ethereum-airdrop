@@ -10,3 +10,5 @@ The system has several interconnected sub-systems:
 This system is monitoring all transactions on TradeHub smart-contract, decode data and filters to those which have CreateWallet method. After that the system taking the swth1 wallet address and checking if that wallet has available SWTH and if it doesn't sends in tokens (5 SWTH atm) to it. 
 
 All the necessary data from transactions, statuses, current pagination statuses are stored in PostgreSQL db. If there is an error the system is sending out an email to the added email addresses with error info.
+
+## Airdrop log here https://swth.info/airdrop-log/

@@ -215,9 +215,8 @@ function getTransactions(startblock=0,page=1)
     return new Promise((resolve,reject)=>{
         var req = request.post({
                 url: 'https://api.etherscan.io/api?module=account&action=txlist'
-                    +'&address='+TRACK_CONTRACT+''
-                    +'&startblock='+startblock+''
-                    +'&endblock=9999999999'
+                    +'&address='+TRACK_CONTRACT
+                    +'&startblock='+startblock
                     +'&sort=asc'
                     +'&offset='+ETH_TRANSACTIONS_LIMIT //limit
                     +'&page='+page

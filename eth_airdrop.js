@@ -15,11 +15,13 @@ const db = new Client({
 })
 
 /* SWITCHEO API PARAMS */
+const SWTH_NODE_ADDR = 'https://tradescan.switcheo.org';
 const NETWORK = 'MAINNET'
 const MNEMONICS = '';
 var SWTH_WALLET, SWTH_REST;
 
 /* ETHEREUM API PARAMS */
+const ETH_API_ADDR = 'https://api.etherscan.io';
 const APIKEY = '';
 const TRACK_CONTRACT = '';
 
@@ -65,7 +67,7 @@ function getSwitcheoWalletBalance(wallet)
 {
     return new Promise((resolve,reject) => {
         var req = request.get({
-            url:`https://tradescan.switcheo.org/get_balance?account=${wallet}`,
+            url:`${SWTH_NODE_ADDR}/get_balance?account=${wallet}`,
             timeout: 10000,
             json: true,
         },
@@ -91,7 +93,7 @@ function getSwitcheoTransaction(hash)
 {
     return new Promise((resolve,reject) => {
         var req = request.get({
-            url:`https://tradescan.switcheo.org/get_transaction?hash=${hash}`,
+            url:`${SWTH_NODE_ADDR}/get_transaction?hash=${hash}`,
             timeout: 10000,
             json: true,
         },
@@ -175,7 +177,7 @@ function getAbiInputSchema()
 {
     return new Promise((resolve,reject) => {
         var req = request.post({
-                url:`https://api.etherscan.io/api?module=contract&action=getabi&address=${TRACK_CONTRACT}&apikey=${APIKEY}`,
+                url:`${ETH_API_ADDR}/api?module=contract&action=getabi&address=${TRACK_CONTRACT}&apikey=${APIKEY}`,
                 timeout: 10000,
                 json: true,
             },
@@ -215,7 +217,7 @@ function getTransactions(startblock=0,page=1)
 {
     return new Promise((resolve,reject)=>{
         var req = request.post({
-                url: 'https://api.etherscan.io/api?module=account&action=txlist'
+                url: ETH_API_ADDR+'/api?module=account&action=txlist'
                     +'&address='+TRACK_CONTRACT
                     +'&startblock='+startblock
                     +'&sort=asc'

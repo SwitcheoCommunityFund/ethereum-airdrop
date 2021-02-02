@@ -276,7 +276,7 @@ async function airdrop(wallet,tx)
                 await pause(SWTH_RETRY_CHECK_BALANCE_PAUSE);
             } else {
                 console.log('AIRDROP ERROR'.red,e,tx.hash);
-                sendErrorEmail(err);
+                sendErrorEmail(e);
                 return saveAirdropState('check_balance_error',wallet,tx);
             }
         }

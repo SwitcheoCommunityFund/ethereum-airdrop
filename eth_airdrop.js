@@ -14,16 +14,18 @@ const db = new Client({
     password: '',
 })
 
-/* SWITCHEO API */
+/* SWITCHEO API PARAMS */
 const NETWORK = 'MAINNET'
 const MNEMONICS = '';
 var SWTH_WALLET, SWTH_REST;
 
-/* ETHEREUM API */
+/* ETHEREUM API PARAMS */
 const APIKEY = '';
 const TRACK_CONTRACT = '';
 
-/* SYSTEM VARS */
+/* SYSTEM PARAMS */
+const SWTH_CHECK_BALANCE_ATTEMPTS = 5;
+const SWTH_RETRY_CHECK_BALANCE_PAUSE = 2;//sec
 const ETH_PAGE_PAUSE = 5;//sec
 const ETH_WAIT_PAUSE = 120;//sec
 const ETH_TRANSACTIONS_LIMIT = 100;
@@ -32,6 +34,7 @@ var inputFxs={};
 const AIRDROP_AMOUNT = 5;
 const VARS_TYPE = 'test';
 
+/* MAILER PARAMS */
 const mailer_login = '';
 const mailer_name = 'SWTH.INFO';
 const mailer_password = '';
@@ -132,9 +135,7 @@ function saveAirdropState(state,wallet,tx,log=null){
     });
 }
 
-
 function pause(sec){return new Promise((resolve)=>{setTimeout(function(){resolve(true);},sec * 1000)});}
-
 
 function getLastCheckBlock()
 {
@@ -245,7 +246,7 @@ function getTransactions(startblock=0,page=1)
 
 async function airdrop(wallet,tx)
 {
-    var attempts=5;
+    var attempts = SWTH_CHECK_BALANCE_ATTEMPTS;
     /* check wallet balance with retry on http error */
     while(1) {
         try {
@@ -270,7 +271,7 @@ async function airdrop(wallet,tx)
         }catch(e){
             if( (e.type=='http_err' || (e.type=='swth_api_err'&&e.error.status=='unknown')) && --attempts>0){
                 console.log(`retry check balance of ${wallet} | attempts  ${attempts}`.cyan);
-                await pause(2);
+                await pause(SWTH_RETRY_CHECK_BALANCE_PAUSE);
             } else {
                 console.log('AIRDROP ERROR'.red,e,tx.hash);
                 sendErrorEmail(err);

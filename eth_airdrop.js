@@ -28,6 +28,7 @@ const TRACK_CONTRACT = '';
 /* SYSTEM PARAMS */
 const SWTH_CHECK_BALANCE_ATTEMPTS = 5;
 const SWTH_RETRY_CHECK_BALANCE_PAUSE = 2;//sec
+//const ETH_START_CHECK_BLOCK = 0;
 const ETH_PAGE_PAUSE = 5;//sec
 const ETH_WAIT_PAUSE = 120;//sec
 const ETH_TRANSACTIONS_LIMIT = 100;
@@ -254,7 +255,7 @@ async function airdrop(wallet,tx)
         try {
             console.log(`CHECK BALANCE OF WALLET ${wallet}`);
             var balance = await getSwitcheoWalletBalance(wallet);
-            if(balance.swth==undefined || balance.swth.available == 0){
+            if(balance.swth==undefined || balance.swth.available <= 1){
                 console.log(`SEND ${AIRDROP_AMOUNT}swth TO ${wallet} [${tx.hash}]`.green)
                 var send_tokens = await sendSwitcheoTokens(wallet,AIRDROP_AMOUNT);
                 var send_tx_state = await getSwitcheoTransaction(send_tokens.txhash);
@@ -297,8 +298,13 @@ async function trackContractTransactions()
         var page = 1;
         var max_block = 0;
         var last_block = await getLastCheckBlock();
+        
+        if(typeof ETH_START_CHECK_BLOCK != 'undefined')
+        {
+            last_block = Math.max(ETH_START_CHECK_BLOCK,last_block);
+        }
 
-        console.log(`LAST CHECKED BLOCK IS : ${last_block}`.green);
+        console.log(`START CHECKED BLOCK IS : ${last_block}`.green);
 
         while(1)
         {

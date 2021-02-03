@@ -12,3 +12,5 @@ This system is monitoring all transactions on TradeHub smart-contract, decode da
 All the necessary data from transactions, statuses, current pagination statuses are stored in PostgreSQL db. If there is an error the system is sending out an email to the added email addresses with error info.
 
 ## Airdrop log: https://swth.info/airdrop-log/
+
+P.S.: And btw just to make it clear for everyone, if a user was using tradehub wallet but didn't create ETH wallet, the moment he creates it the system will check if he has available SWTH and WILL airdrop if doesn't have and that is exactly how it was intended to work from the very beginning. So if folks for example created accounts long ago and staked all their SWTH and now decided to trade, sent in ETH or ERC-20 tokens to their wallets, created an ETH wallet on top and have no available SWTH at that time they will get an airdrop, yes!

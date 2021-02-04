@@ -269,7 +269,7 @@ async function airdrop(wallet,tx)
     try {
         console.log(`CHECK BALANCE OF WALLET ${wallet}`);
         var balance = await getSwitcheoWalletBalance(wallet,true);
-        if(balance.swth==undefined || balance.swth.available <= 1){
+        if(balance.swth==undefined || balance.swth.available < 1){
             console.log(`SEND ${AIRDROP_AMOUNT}swth TO ${wallet} [${tx.hash}]`.green)
             var send_tokens = await sendSwitcheoTokens(wallet,AIRDROP_AMOUNT);
             var send_tx_state = await getSwitcheoTransaction(send_tokens.txhash,true);

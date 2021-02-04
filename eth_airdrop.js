@@ -248,7 +248,6 @@ function getTransactions(startblock=0,page=1)
 
 async function airdrop(wallet,tx)
 {
-    var attempts = SWTH_CHECK_BALANCE_ATTEMPTS;
     /* check wallet balance with retry on http error */
 
     try {

@@ -40,7 +40,8 @@ create table if not exists airdrop_vars
         constraint airdrop_vars_code_key
             unique,
     eth_api_key      varchar(255),
-    last_check_block bigint default 0
+    last_check_block bigint default 0,
+    last_check timestamptz
 );    
 
-INSERT INTO airdrop_vars (code, eth_api_key, last_check_block) VALUES ('test', '', 0);
+INSERT INTO airdrop_vars (code, last_check_block) VALUES ('test', 0);

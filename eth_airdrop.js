@@ -15,7 +15,6 @@ const db = new Client({
 })
 
 /* SWITCHEO API PARAMS */
-const SWTH_NODE_ADDR = 'https://tradescan.switcheo.org';
 const NETWORK = 'MAINNET'
 const MNEMONICS = '';
 var SWTH_WALLET, SWTH_REST;
@@ -26,8 +25,8 @@ const APIKEY = '';
 const TRACK_CONTRACT = '';
 
 /* SYSTEM PARAMS */
-const SWTH_CHECK_BALANCE_ATTEMPTS = 5;
-const SWTH_RETRY_CHECK_BALANCE_PAUSE = 2;//sec
+const SWTH_API_ATTEMPTS = 5;
+const SWTH_API_RETRY_PAUSE = 4;//sec
 //const ETH_START_CHECK_BLOCK = 0;
 const ETH_PAGE_PAUSE = 5;//sec
 const ETH_WAIT_PAUSE = 120;//sec
@@ -43,77 +42,75 @@ const mailer_name = 'SWTH.INFO';
 const mailer_password = '';
 const mailer_receivers = [''];
 
-let transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,//587,
-    secure: true, // true for 465, false for other ports
-    auth: {
-        user: mailer_login,
-        pass: mailer_password,
-    },
-});
 
-function sendErrorEmail(data){
-    var email_text = JSON.stringify(data);
+
+function sendErrorEmail(data)
+{
+    var transporter = nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 465,//587,
+        secure: true, // true for 465, false for other ports
+        auth: {
+            user: mailer_login,
+            pass: mailer_password,
+        },
+    });
+
+    var time = (new Date()).toISOString().replace(/T/,' ');
+    var email_text = JSON.stringify(data,jsonErrorReplacer);
     return transporter.sendMail({
-        from: `"${mailer_name}" <${mailer_login}>`, 
-        to: mailer_receivers.join(", "), 
-        subject: "[AIRDROP ERROR] "+time,
-        text: email_text,
+        from    : `"${mailer_name}" <${mailer_login}>`,
+        to      : mailer_receivers.join(", "),
+        subject : "[AIRDROP ERROR] "+time,
+        text    : email_text
     });
 }
 
-
-function getSwitcheoWalletBalance(wallet)
+function getSwitcheoWalletBalance(wallet,show_retries=false)
 {
-    return new Promise((resolve,reject) => {
-        var req = request.get({
-            url:`${SWTH_NODE_ADDR}/get_balance?account=${wallet}`,
-            timeout: 10000,
-            json: true,
-        },
-        (err,resp,body)=>{
+    return new Promise(async function (resolve,reject){
+        var attempts=SWTH_API_ATTEMPTS;
+        while(1){
             try{
-                if(err){ reject({type:'http_err',error:err}); }
-
-                if(typeof body != 'object'){
-                    reject({type:'swth_api_err',error:{status:'unknown',message:body}});
+                if(show_retries && SWTH_API_ATTEMPTS>attempts)
+                    console.log(`retry check balance of ${wallet} | attempts left ${attempts}`.cyan);
+                var balance = await SWTH_REST.getWalletBalance({address: wallet});
+                resolve(balance);
+                break;
+            }catch (e) {
+                if(--attempts<0){
+                    reject(e);
+                    break;
                 } else {
-                    resolve(body);
-                } /*else {
-                    reject({type:'swth_api_err',error:{status:'empty',message:'wallet not found', wallet:wallet}});
-                }*/
-            }catch(e){
-                reject({type:'unknown_err',error:{response:body}});
-            }
-        })
-    });
-}
-
-function getSwitcheoTransaction(hash)
-{
-    return new Promise((resolve,reject) => {
-        var req = request.get({
-            url:`${SWTH_NODE_ADDR}/get_transaction?hash=${hash}`,
-            timeout: 10000,
-            json: true,
-        },
-        (err,resp,body)=>{
-            try{
-                if(err){ reject({type:'http_err',error:err}); }
-
-                if(typeof body != 'object'){
-                    reject({type:'swth_api_err',error:{status:'unknown',message:body}});
-                } else {
-                    resolve(body);
+                    await pause(SWTH_API_RETRY_PAUSE);
                 }
-            }catch(e){
-                reject({type:'unknown_err',error:{response:body}});
             }
-        })
+        }
     });
 }
 
+function getSwitcheoTransaction(hash,show_retries=false)
+{
+    return new Promise(async function (resolve,reject){
+        var attempts=SWTH_API_ATTEMPTS;
+        while(1){
+            try{
+                if(show_retries && SWTH_API_ATTEMPTS>attempts)
+                    console.log(`retry check Switcheo Tx ${hash} | attempts left ${attempts}`.cyan);
+                var tx = await SWTH_REST.getTx({id: hash});
+                resolve(tx);
+                break;
+            }catch (e) {
+                if(--attempts<0){
+                    reject(e);
+                    break;
+                } else {
+                    await pause(SWTH_API_RETRY_PAUSE);
+                }
+            }
+        }
+    });
+}
 
 function sendSwitcheoTokens(wallet,value)
 {
@@ -125,12 +122,25 @@ function sendSwitcheoTokens(wallet,value)
     return SWTH_REST.send(message);
 }
 
-function saveAirdropState(state,wallet,tx,log=null){
+function pause(sec){return new Promise((resolve)=>{setTimeout(function(){resolve(true);},sec * 1000)});}
+
+function jsonErrorReplacer(key, value)
+{
+    if (value instanceof Error) {
+        return {name: value.name, message: value.message, stack: value.stack,}
+    }
+    return value
+}
+
+function saveAirdropState(state,wallet,tx,log=null)
+{
     return  new Promise((resolve,reject) => {
         var time = (new Date()).toISOString().replace(/T/,' ');
+        log = log==null?null:JSON.stringify(log,jsonErrorReplacer);
         db.query(`INSERT 
                   INTO airdrop_log (tx_id,air_time,amount,wallet,status,"log")
                   VALUES ($1,$2,$3,$4,(SELECT id FROM airdrop_log_states WHERE state_code = $5),$6)
+                  ON CONFLICT DO NOTHING
         `,[tx.hash,time,AIRDROP_AMOUNT,wallet,state,log], (err, res) => {
             if(err) reject(err);
             resolve();
@@ -138,15 +148,17 @@ function saveAirdropState(state,wallet,tx,log=null){
     });
 }
 
-function pause(sec){return new Promise((resolve)=>{setTimeout(function(){resolve(true);},sec * 1000)});}
-
 function getLastCheckBlock()
 {
     return  new Promise((resolve,reject) => {
-        db.query("SELECT * from airdrop_vars where code = $1",[VARS_TYPE], (err, res) => {
+        db.query({
+                text:"SELECT * from airdrop_vars where code = $1",
+                rowMode: 'object',
+                values:[VARS_TYPE]
+            }, (err, res) => {
             if(err) reject(err);
-            if(typeof res.rows[0] == 'undefined') reject('cant find var');
-            resolve(res.rows[0].last_check_block);
+            if(typeof res.rows[0] == 'undefined' || res.rows.length==0) reject('cant find last_check_block');
+            resolve(parseInt(res.rows[0].last_check_block));
         })
     });
 }
@@ -154,7 +166,11 @@ function getLastCheckBlock()
 function setLastCheckBlock(block)
 {
     return  new Promise((resolve,reject) => {
-        db.query("UPDATE airdrop_vars SET last_check_block = $1 where code = $2",[block,VARS_TYPE], (err, res) => {
+        var time = (new Date()).toISOString().replace(/T/,' ');
+        db.query(`INSERT INTO airdrop_vars (code,last_check_block,eth_api_key,last_check) values ($1,$2,$3,$4)
+                  ON CONFLICT (code)
+                  DO UPDATE SET last_check_block = $2, eth_api_key=$3, last_check=$4`
+            ,[VARS_TYPE,block,APIKEY,time], (err, res) => {
             if(err) reject(err);
             resolve();
         })
@@ -249,38 +265,28 @@ function getTransactions(startblock=0,page=1)
 
 async function airdrop(wallet,tx)
 {
-    var attempts = SWTH_CHECK_BALANCE_ATTEMPTS;
     /* check wallet balance with retry on http error */
-    while(1) {
-        try {
-            console.log(`CHECK BALANCE OF WALLET ${wallet}`);
-            var balance = await getSwitcheoWalletBalance(wallet);
-            if(balance.swth==undefined || balance.swth.available <= 1){
-                console.log(`SEND ${AIRDROP_AMOUNT}swth TO ${wallet} [${tx.hash}]`.green)
-                var send_tokens = await sendSwitcheoTokens(wallet,AIRDROP_AMOUNT);
-                var send_tx_state = await getSwitcheoTransaction(send_tokens.txhash);
-                if(send_tx_state.code==0){
-                    await saveAirdropState('success',wallet,tx);
-                } else {
-                    console.log(`xxx SEND ${AIRDROP_AMOUNT}swth TO ${wallet} xxx`.red)
-                    await saveAirdropState('airdrop_fail',wallet,tx);
-                }
-                //await saveAirdropState('success',wallet,tx);
+    try {
+        console.log(`CHECK BALANCE OF WALLET ${wallet}`);
+        var balance = await getSwitcheoWalletBalance(wallet,true);
+        if(balance.swth==undefined || balance.swth.available <= 1){
+            console.log(`SEND ${AIRDROP_AMOUNT}swth TO ${wallet} [${tx.hash}]`.green)
+            var send_tokens = await sendSwitcheoTokens(wallet,AIRDROP_AMOUNT);
+            var send_tx_state = await getSwitcheoTransaction(send_tokens.txhash,true);
+            if(send_tx_state.code=='0'){
+                await saveAirdropState('success',wallet,tx);
             } else {
-                console.log(`HIGH BALLANCE OF WALLET ${wallet}`.gray);
-                await saveAirdropState('high_balance',wallet,tx);
+                console.log(`xxx SEND ${AIRDROP_AMOUNT}swth TO ${wallet} xxx`.red)
+                await saveAirdropState('airdrop_fail',wallet,tx,e);
             }
-            break;
-        }catch(e){
-            if( (e.type=='http_err' || (e.type=='swth_api_err'&&e.error.status=='unknown')) && --attempts>0){
-                console.log(`retry check balance of ${wallet} | attempts  ${attempts}`.cyan);
-                await pause(SWTH_RETRY_CHECK_BALANCE_PAUSE);
-            } else {
-                console.log('AIRDROP ERROR'.red,e,tx.hash);
-                sendErrorEmail(e);
-                return saveAirdropState('check_balance_error',wallet,tx);
-            }
+        } else {
+            console.log(`HIGH BALLANCE OF WALLET ${wallet}`.gray);
+            await saveAirdropState('high_balance',wallet,tx);
         }
+    }catch(e){
+        console.log('AIRDROP ERROR'.red,e,tx.hash);
+        sendErrorEmail(e);
+        return saveAirdropState('check_balance_error',wallet,tx,e);
     }
 }
 
@@ -296,15 +302,15 @@ async function trackContractTransactions()
         await db.connect();
 
         var page = 1;
-        var max_block = 0;
         var last_block = await getLastCheckBlock();
-        
+        var max_block = last_block;
+
         if(typeof ETH_START_CHECK_BLOCK != 'undefined')
         {
             last_block = Math.max(ETH_START_CHECK_BLOCK,last_block);
         }
 
-        console.log(`START CHECKED BLOCK IS : ${last_block}`.green);
+        console.log(`LAST CHECKED BLOCK IS : ${last_block}`.green);
 
         while(1)
         {
@@ -315,14 +321,14 @@ async function trackContractTransactions()
                 if(txInput.fx_name=='createWallet' && txs[i].isError=='0'){
                     //console.log(`tx_hash : ${txs[i].hash}`);
                     var switcheo_wallet = decodeSwthAddr(txInput.values['_swthAddress']);
-                    airdrop(switcheo_wallet,txs[i])
+                    await airdrop(switcheo_wallet,txs[i])
                 }
-                max_block = parseInt(txs[i].blockNumber);
+                max_block = Math.max(last_block,parseInt(txs[i].blockNumber));
             }
+            await setLastCheckBlock(max_block);
             if(txs.length >= ETH_TRANSACTIONS_LIMIT){
                 page++;
                 console.log(`NEXT PAGE OF TRANSACTIONS: ${page} [last_blk:${max_block}]`.yellow);
-                setLastCheckBlock(max_block);
                 await pause(ETH_PAGE_PAUSE);
             } else {
                 page = 0;
@@ -334,16 +340,18 @@ async function trackContractTransactions()
         }
     }catch (e) {
         console.error('ERROR ON TRACKING'.red,e);
-        sendErrorEmail(e);
-        process.exit(1);
+        sendErrorEmail(e)
+            .then(()=>{process.exit(1);})
+            .catch(()=>{process.exit(1);});
     }
-
 }
 
 
 trackContractTransactions();
 
 process.on('uncaughtException', function(err){
-    sendErrorEmail(err);
-    process.exit(1);
+    console.log(err);
+    sendErrorEmail(err)
+        .then(()=>{process.exit(1);})
+        .catch(()=>{process.exit(1);});
 });
